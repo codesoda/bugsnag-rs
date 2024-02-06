@@ -2,7 +2,7 @@ use super::event::Event;
 
 const NOTIFIER_NAME: &'static str = "Bugsnag Rust";
 const NOTIFIER_VERSION: &'static str = env!("CARGO_PKG_VERSION");
-const NOTIFIER_URL: &'static str = "https://github.com/superscale/bugsnag-api-rs";
+const NOTIFIER_URL: &'static str = "https://github.com/mehcode/bugsnag-rs";
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -80,8 +80,10 @@ mod tests {
         let exceptions = vec![exception::Exception::new("Assert", "Assert", &frames)];
         let device = deviceinfo::DeviceInfo::new("1.0.0", "testmachine");
         let app = None;
+        let user = None;
+        let unhandled = None;
         let events = vec![
-            event::Event::new(&exceptions, None, None, None, &device, &app),
+            event::Event::new(&exceptions, None, None, None, &device, &app, &user, &unhandled),
         ];
 
         let notification = Notification::new("safe-api-key", &events);

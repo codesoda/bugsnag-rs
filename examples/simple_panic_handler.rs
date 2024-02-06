@@ -22,12 +22,18 @@ fn test() -> Option<i32> {
 }
 
 fn main() {
+    let api_key = "api-key";
     let mut api =
-        bugsnag::Bugsnag::new("api-key", concat!(env!("CARGO_MANIFEST_DIR"), "/examples"));
+        bugsnag::Bugsnag::new(api_key, concat!(env!("CARGO_MANIFEST_DIR"), "/examples"));
     api.set_app_info(
         Some(env!("CARGO_PKG_VERSION")),
         Some("development"),
         Some("rust"),
+    );
+    api.set_user(
+        "19",
+        Some("Chris Raethke"),
+        Some("chris@example.com")
     );
 
     register_panic_handler(api);

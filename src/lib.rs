@@ -37,4 +37,5 @@ mod bugsnag_impl;
 pub use self::bugsnag_impl::*;
 mod deviceinfo;
 mod appinfo;
+mod user;
 pub mod panic;

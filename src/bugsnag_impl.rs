@@ -1,4 +1,4 @@
-use super::{appinfo, deviceinfo, event, exception, notification, stacktrace};
+use super::{appinfo, deviceinfo, event, exception, notification, stacktrace, user};
 
 use std::fmt;
 use std::error::Error as StdError;
@@ -21,7 +21,7 @@ pub enum Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.description())
+        write!(f, "{}", self.to_string())
     }
 }
 
@@ -49,6 +49,7 @@ pub struct Bugsnag {
     device_info: deviceinfo::DeviceInfo,
     app_info: Option<appinfo::AppInfo>,
     project_source_dir: String,
+    user: Option<user::User>,
 }
 
 /// Builder for creating the notification that will be send to Bugsnag.
@@ -62,6 +63,7 @@ pub struct NotifyBuilder<'a, 'bugsnag> {
     context: Option<&'a str>,
     severity: Option<Severity>,
     grouping_hash: Option<&'a str>,
+    unhandled: Option<bool>,
 }
 
 impl<'a, 'bugsnag> NotifyBuilder<'a, 'bugsnag> {
@@ -79,6 +81,7 @@ impl<'a, 'bugsnag> NotifyBuilder<'a, 'bugsnag> {
             context: None,
             severity: None,
             grouping_hash: None,
+            unhandled: None,
         }
     }
 
@@ -111,6 +114,11 @@ impl<'a, 'bugsnag> NotifyBuilder<'a, 'bugsnag> {
         self
     }
 
+    pub fn unhandled(mut self , val: bool) -> Self {
+        self.unhandled = Some(val);
+        self
+    }
+
     /// Call this function to explicitly send the notification to Bugsnag.
     /// This function will be called implicit if this object is dropped, but the notification will
     /// not be send twice.
@@ -139,6 +147,8 @@ impl<'a, 'bugsnag> NotifyBuilder<'a, 'bugsnag> {
                 self.grouping_hash,
                 &self.bugsnag.device_info,
                 &self.bugsnag.app_info,
+                &self.bugsnag.user,
+                &self.unhandled,
             ),
         ];
         let notification = notification::Notification::new(&self.bugsnag.api_key, &events);
@@ -164,6 +174,7 @@ impl Bugsnag {
             device_info: deviceinfo::DeviceInfo::generate(),
             app_info: None,
             project_source_dir: project_source_dir.to_owned(),
+            user: None,
         }
     }
 
@@ -205,7 +216,10 @@ impl Bugsnag {
             .send()
         {
             Ok(_) => Ok(()),
-            Err(_) => Err(Error::JsonTransferFailed),
+            Err(e) => {
+                eprintln!("Error sending: {e:?}");
+                Err(Error::JsonTransferFailed)
+            },
         }
     }
 
@@ -234,6 +248,19 @@ impl Bugsnag {
 
     pub fn reset_app_info(&mut self) {
         self.app_info = None;
+    }
+
+    pub fn set_user(
+        &mut self,
+        id: &str,
+        name: Option<&str>,
+        email: Option<&str>,
+    ) {
+        self.user = Some(user::User::new(id, name, email));
+    }
+
+    pub fn reset_user(&mut self) {
+        self.user = None;
     }
 
     pub fn get_project_source_dir(&self) -> &String {

@@ -2,8 +2,9 @@ use super::exception::Exception;
 use super::Severity;
 use super::deviceinfo::DeviceInfo;
 use super::appinfo::AppInfo;
+use super::user::User;
 
-pub const PAYLOAD_VERSION: u32 = 4;
+pub const PAYLOAD_VERSION: u32 = 5;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,6 +16,8 @@ pub struct Event<'a> {
     device: &'a DeviceInfo,
     #[serde(skip_serializing_if = "Option::is_none")] app: &'a Option<AppInfo>,
     #[serde(skip_serializing_if = "Option::is_none")] group_hash: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")] user: &'a Option<User>,
+    #[serde(skip_serializing_if = "Option::is_none")] unhandled: &'a Option<bool>,
 }
 
 impl<'a> Event<'a> {
@@ -25,6 +28,8 @@ impl<'a> Event<'a> {
         group_hash: Option<&'a str>,
         device: &'a DeviceInfo,
         app: &'a Option<AppInfo>,
+        user: &'a Option<User>,
+        unhandled: &'a Option<bool>,
     ) -> Event<'a> {
         Event {
             payload_version: PAYLOAD_VERSION,
@@ -34,6 +39,8 @@ impl<'a> Event<'a> {
             device,
             app,
             group_hash,
+            user,
+            unhandled
         }
     }
 }
@@ -48,6 +55,8 @@ mod tests {
         let empty_vec = Vec::new();
         let device = DeviceInfo::new("1.0.0", "testmachine");
         let app = None;
+        let user = None;
+        let unhandled = None;
         let evt = Event::new(
             &empty_vec,
             Some(&Severity::Error),
@@ -55,6 +64,8 @@ mod tests {
             None,
             &device,
             &app,
+            &user,
+            &unhandled,
         );
 
         assert_ser_tokens(
@@ -95,6 +106,8 @@ mod tests {
         let empty_vec = Vec::new();
         let device = DeviceInfo::new("1.0.0", "testmachine");
         let app = None;
+        let user = None;
+        let unhandled = None;
         let evt = Event::new(
             &empty_vec,
             Some(&Severity::Error),
@@ -102,6 +115,8 @@ mod tests {
             None,
             &device,
             &app,
+            &user,
+            &unhandled
         );
 
         assert_ser_tokens(
@@ -145,6 +160,8 @@ mod tests {
         let empty_vec = Vec::new();
         let device = DeviceInfo::new("1.0.0", "testmachine");
         let app = Some(AppInfo::new(Some("1.0.0"), Some("test"), Some("rust")));
+        let user = None;
+        let unhandled = None;
         let evt = Event::new(
             &empty_vec,
             Some(&Severity::Error),
@@ -152,6 +169,8 @@ mod tests {
             None,
             &device,
             &app,
+            &user,
+            &unhandled
         );
 
         assert_ser_tokens(

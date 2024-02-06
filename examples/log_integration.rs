@@ -7,41 +7,44 @@ extern crate bugsnag;
 #[macro_use]
 extern crate log;
 
-use log::{LogLevel, LogMetadata, LogRecord, SetLoggerError};
+use log::{Level, Metadata, Record, SetLoggerError};
 
 /// Our logger for bugsnag
 struct BugsnagLogger {
-    max_loglevel: LogLevel,
+    max_loglevel: Level,
     api: bugsnag::Bugsnag,
 }
 
 impl BugsnagLogger {
-    pub fn init(api: bugsnag::Bugsnag, max_loglevel: LogLevel) -> Result<(), SetLoggerError> {
-        log::set_logger(|max_level| {
-            max_level.set(log::LogLevelFilter::Info);
-            Box::new(BugsnagLogger {
-                api: api,
-                max_loglevel: max_loglevel,
-            })
-        })
+    pub fn init(api: bugsnag::Bugsnag, max_loglevel: Level) -> Result<(), SetLoggerError> {
+        let logger: Box<dyn log::Log + 'static> = Box::new(BugsnagLogger {
+            api: api,
+            max_loglevel: max_loglevel,
+        });
+        match log::set_logger(Box::leak(logger)) {
+            Ok(()) => {
+                Ok(())
+            },
+            Err(e) => return Err(e),
+        }
     }
 }
 
-fn convert_log_level(level: LogLevel) -> bugsnag::Severity {
+fn convert_log_level(level: Level) -> bugsnag::Severity {
     match level {
-        LogLevel::Info => bugsnag::Severity::Info,
-        LogLevel::Warn => bugsnag::Severity::Warning,
-        LogLevel::Error => bugsnag::Severity::Error,
+        Level::Info => bugsnag::Severity::Info,
+        Level::Warn => bugsnag::Severity::Warning,
+        Level::Error => bugsnag::Severity::Error,
         _ => bugsnag::Severity::Info,
     }
 }
 
 impl log::Log for BugsnagLogger {
-    fn enabled(&self, metadata: &LogMetadata) -> bool {
+    fn enabled(&self, metadata: &Metadata) -> bool {
         metadata.level() <= self.max_loglevel
     }
 
-    fn log(&self, record: &LogRecord) {
+    fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
             let level = convert_log_level(record.metadata().level());
             let level_str = record.metadata().level().to_string();
@@ -50,19 +53,29 @@ impl log::Log for BugsnagLogger {
             self.api.notify(&level_str, &message).severity(level);
         }
     }
+
+    fn flush(&self) {}
 }
 
 fn main() {
+    let api_key = "api-key";
     let mut api =
-        bugsnag::Bugsnag::new("api-key", concat!(env!("CARGO_MANIFEST_DIR"), "/examples"));
+        bugsnag::Bugsnag::new(api_key, concat!(env!("CARGO_MANIFEST_DIR"), "/examples"));
+
     api.set_app_info(
         Some(env!("CARGO_PKG_VERSION")),
         Some("development"),
         Some("rust"),
     );
 
+    api.set_user(
+        "19",
+        Some("Chris Raethke"),
+        Some("chris@example.com")
+    );
+
     // initialize the logger
-    BugsnagLogger::init(api, LogLevel::Warn).unwrap();
+    BugsnagLogger::init(api, Level::Warn).unwrap();
 
     // the following two messages should not show up in bugsnag, because
     // we set the maximum log level to errors

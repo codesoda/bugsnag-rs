@@ -5,6 +5,21 @@ use sys_info;
 pub struct DeviceInfo {
     os_version: String,
     hostname: String,
+    // id: string,
+    // manufacturer: string,
+    // model: string,
+    // modelNumber: string,
+    // osName: string,
+    // osVersion: string,
+    // freeMemory: string,
+    // totalMemory: string,
+    // freeDisk: string,
+    // browserName: string,
+    // browserVersion: string,
+    // jailbroken: bool,
+    // orientation: string,
+    // time: string (ISO 8061 format)
+
 }
 
 impl DeviceInfo {
