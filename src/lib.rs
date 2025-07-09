@@ -20,7 +20,7 @@
 //! folder provides some reference implementations.
 
 extern crate backtrace;
-extern crate hyper;
+extern crate reqwest;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -28,6 +28,8 @@ extern crate serde_json;
 #[cfg(test)]
 extern crate serde_test;
 extern crate sys_info;
+extern crate chrono;
+extern crate lazy_static;
 
 mod event;
 mod notification;

@@ -1,10 +1,10 @@
 use super::{Bugsnag, Error, Severity};
 
-use std::panic::PanicInfo;
+use std::panic::PanicHookInfo;
 
 pub fn handle(
     api: &Bugsnag,
-    info: &PanicInfo,
+    info: &PanicHookInfo,
     methods_to_ignore: Option<&[&str]>,
 ) -> Result<(), Error> {
     let message = if let Some(data) = info.payload().downcast_ref::<String>() {

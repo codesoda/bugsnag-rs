@@ -5,10 +5,9 @@ use std::error::Error as StdError;
 
 use serde_json;
 
-use hyper::Client;
-use hyper::header::ContentType;
+use reqwest::blocking::Client;
 
-const NOTIFY_URL: &'static str = "http://notify.bugsnag.com";
+const NOTIFY_URL: &'static str = "https://notify.bugsnag.com";
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
@@ -211,8 +210,8 @@ impl Bugsnag {
     fn send(&self, json: &str) -> Result<(), Error> {
         match Client::new()
             .post(NOTIFY_URL)
-            .header(ContentType::json())
-            .body(json)
+            .header("content-type", "application/json")
+            .body(json.to_string())
             .send()
         {
             Ok(_) => Ok(()),
