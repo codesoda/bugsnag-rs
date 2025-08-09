@@ -188,21 +188,68 @@ impl Bugsnag {
     }
 
     fn create_stacktrace(&self, methods_to_ignore: Option<&[&str]>) -> Vec<stacktrace::Frame> {
+        // Helper to generate a trimmed stack from an in-project check and an optional ignore matcher
+        fn trim_frames(
+            mut frames: Vec<stacktrace::Frame>,
+            should_ignore: Option<&dyn Fn(&str) -> bool>,
+        ) -> Vec<stacktrace::Frame> {
+            // Prefer to start at the first in-project frame that isn't ignored.
+            let start = frames
+                .iter()
+                .position(|f| {
+                    let ignore = should_ignore.map(|s| s(f.method())).unwrap_or(false);
+                    f.in_project() && !ignore
+                })
+                // Fallback: first non-ignored frame
+                .or_else(|| {
+                    if let Some(si) = should_ignore {
+                        frames.iter().position(|f| !si(f.method()))
+                    } else {
+                        None
+                    }
+                })
+                // Fallback: keep from the very first frame
+                .unwrap_or(0);
+
+            // End at the last in-project frame (to avoid runtimes at the tail), if any
+            let end = frames
+                .iter()
+                .rposition(|f| f.in_project())
+                .map(|i| i + 1)
+                .unwrap_or(frames.len());
+
+            if start < end && end <= frames.len() {
+                frames[start..end].to_vec()
+            } else if start < frames.len() {
+                frames[start..].to_vec()
+            } else {
+                frames
+            }
+        }
+
         if let Some(ignore) = methods_to_ignore {
+            // Correct logic: in-project only if file is under project dir AND method is not ignored
             let in_project_check = |file: &str, method: &str| {
                 file.starts_with(self.project_source_dir.as_str())
-                    && ignore
-                        .iter()
-                        .find(|check| !method.contains(*check))
-                        .is_some()
+                    && !ignore.iter().any(|check| method.contains(*check))
             };
 
-            stacktrace::create_stacktrace(&in_project_check)
+            let should_ignore = |method: &str| ignore.iter().any(|check| method.contains(*check));
+            let frames = stacktrace::create_stacktrace(&in_project_check);
+            trim_frames(frames, Some(&should_ignore))
         } else {
-            let in_project_check =
-                |file: &str, _: &str| file.starts_with(self.project_source_dir.as_str());
+            // Default behavior: mark in-project by path, then lightly trim known capture frames
+            let in_project_check = |file: &str, _: &str| file.starts_with(self.project_source_dir.as_str());
+            let frames = stacktrace::create_stacktrace(&in_project_check);
 
-            stacktrace::create_stacktrace(&in_project_check)
+            // Default ignores keep only obvious capture/internal frames out of the header
+            let default_ignores = [
+                "backtrace::",                    // backtrace capture frames
+                "bugsnag::stacktrace",            // our own stacktrace helper
+                "bugsnag::bugsnag_impl::",        // our own wrapper
+            ];
+            let should_ignore = |method: &str| default_ignores.iter().any(|p| method.contains(p));
+            trim_frames(frames, Some(&should_ignore))
         }
     }
 

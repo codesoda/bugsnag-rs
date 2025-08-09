@@ -1,10 +1,10 @@
 //! Module for creating a stacktrace in the Bugsnag format.
 
-use std::path::Path;
 use backtrace::{self, Symbol};
+use std::path::Path;
 
 /// Struct for storing the one frame of the stacktrace.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Frame {
     file: String,
@@ -50,6 +50,17 @@ impl Frame {
             method.as_str(),
             in_project(file, method.as_str()),
         )
+    }
+
+    // Added getters for post-processing and trimming logic
+    pub fn file(&self) -> &str {
+        &self.file
+    }
+    pub fn method(&self) -> &str {
+        &self.method
+    }
+    pub fn in_project(&self) -> bool {
+        self.in_project
     }
 }
 
