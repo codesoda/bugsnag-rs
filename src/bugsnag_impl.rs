@@ -6,6 +6,7 @@ use std::error::Error as StdError;
 use serde_json;
 
 use reqwest::blocking::Client;
+use reqwest::Client as AsyncClient;
 
 const NOTIFY_URL: &'static str = "https://notify.bugsnag.com";
 
@@ -43,6 +44,7 @@ pub enum Severity {
     Info,
 }
 
+#[derive(Clone)]
 pub struct Bugsnag {
     api_key: String,
     device_info: deviceinfo::DeviceInfo,
@@ -63,6 +65,7 @@ pub struct NotifyBuilder<'a, 'bugsnag> {
     severity: Option<Severity>,
     grouping_hash: Option<&'a str>,
     unhandled: Option<bool>,
+    custom_stacktrace: Option<Vec<stacktrace::Frame>>,
 }
 
 impl<'a, 'bugsnag> NotifyBuilder<'a, 'bugsnag> {
@@ -81,6 +84,7 @@ impl<'a, 'bugsnag> NotifyBuilder<'a, 'bugsnag> {
             severity: None,
             grouping_hash: None,
             unhandled: None,
+            custom_stacktrace: None,
         }
     }
 
@@ -118,7 +122,14 @@ impl<'a, 'bugsnag> NotifyBuilder<'a, 'bugsnag> {
         self
     }
 
-    /// Call this function to explicitly send the notification to Bugsnag.
+    /// Sets a custom stacktrace for this notification.
+    /// If not provided, bugsnag will generate its own stacktrace.
+    pub fn with_stacktrace(mut self, stacktrace: Vec<stacktrace::Frame>) -> Self {
+        self.custom_stacktrace = Some(stacktrace);
+        self
+    }
+
+    /// Call this function to explicitly send the notification to Bugsnag (blocking).
     /// This function will be called implicit if this object is dropped, but the notification will
     /// not be send twice.
     pub fn send(&mut self) -> Result<(), Error> {
@@ -132,9 +143,26 @@ impl<'a, 'bugsnag> NotifyBuilder<'a, 'bugsnag> {
         self.bugsnag.send(&json)
     }
 
+    /// Call this function to explicitly send the notification to Bugsnag (async).
+    /// This function will NOT be called implicitly on drop.
+    pub async fn send_async(&mut self) -> Result<(), Error> {
+        if self.send_executed {
+            return Ok(());
+        }
+
+        self.send_executed = true;
+
+        let json = self.prepare_json()?;
+        self.bugsnag.send_async(&json).await
+    }
+
     /// Prepares the json as string
     fn prepare_json(&self) -> Result<String, Error> {
-        let stacktrace = self.bugsnag.create_stacktrace(self.methods_to_ignore);
+        let stacktrace = if let Some(ref custom) = self.custom_stacktrace {
+            custom.clone()
+        } else {
+            self.bugsnag.create_stacktrace(self.methods_to_ignore)
+        };
         let exceptions = vec![
             exception::Exception::new(self.error_class, self.message, &stacktrace),
         ];
@@ -166,6 +194,12 @@ impl<'a, 'bugsnag> Drop for NotifyBuilder<'a, 'bugsnag> {
 }
 
 impl Bugsnag {
+    /// Creates a stacktrace with the given methods to ignore.
+    /// This is the same method used internally by notify() when no custom stacktrace is provided.
+    pub fn build_stacktrace(&self, methods_to_ignore: Option<&[&str]>) -> Vec<stacktrace::Frame> {
+        self.create_stacktrace(methods_to_ignore)
+    }
+
     /// Creates a new instance of the Bugsnag api
     pub fn new(api_key: &str, project_source_dir: &str) -> Bugsnag {
         Bugsnag {
@@ -190,7 +224,7 @@ impl Bugsnag {
     fn create_stacktrace(&self, methods_to_ignore: Option<&[&str]>) -> Vec<stacktrace::Frame> {
         // Helper to generate a trimmed stack from an in-project check and an optional ignore matcher
         fn trim_frames(
-            mut frames: Vec<stacktrace::Frame>,
+            frames: Vec<stacktrace::Frame>,
             should_ignore: Option<&dyn Fn(&str) -> bool>,
         ) -> Vec<stacktrace::Frame> {
             // Prefer to start at the first in-project frame that isn't ignored.
@@ -253,13 +287,30 @@ impl Bugsnag {
         }
     }
 
-    /// Send a json string to the Bugsnag endpoint
+    /// Send a json string to the Bugsnag endpoint (blocking)
     fn send(&self, json: &str) -> Result<(), Error> {
         match Client::new()
             .post(NOTIFY_URL)
             .header("content-type", "application/json")
             .body(json.to_string())
             .send()
+        {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                eprintln!("Error sending: {e:?}");
+                Err(Error::JsonTransferFailed)
+            },
+        }
+    }
+
+    /// Send a json string to the Bugsnag endpoint (async)
+    async fn send_async(&self, json: &str) -> Result<(), Error> {
+        match AsyncClient::new()
+            .post(NOTIFY_URL)
+            .header("content-type", "application/json")
+            .body(json.to_string())
+            .send()
+            .await
         {
             Ok(_) => Ok(()),
             Err(e) => {

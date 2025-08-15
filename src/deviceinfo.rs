@@ -40,7 +40,7 @@ lazy_static! {
     };
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeviceInfo {
     id: Option<String>,
@@ -58,7 +58,7 @@ pub struct DeviceInfo {
     time: String,
 }
 
-#[derive(Debug, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct DiskInfo {
     total: u64,
